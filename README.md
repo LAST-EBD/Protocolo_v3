@@ -9,11 +9,11 @@ Referencias:
 
 -Protocolo de normalización de imágenes y generación de productos derivados del Laboratorio de SIG y Teledetección de la Estación Biológica de Doñana (LAST-EBD):
 
-    Díaz-Delgado, R., Aragonés, D., Afán, I. and Bustamante, J. 2016. Long-Term Monitoring of the Flooding Regime and Hydroperiod           of Doñana Marshes with Landsat Time Series (1974–2014) Remote Sensing 8,775
-
+   Díaz-Delgado, R., Aragonés, D., Afán, I. and Bustamante, J. 2016. Long-Term Monitoring of the Flooding Regime and Hydroperiod of Doñana Marshes with Landsat Time Series (1974–2014) Remote Sensing 8,775;doi:10.3390/rs8090775
+   
 -Correción Radiométrica:
 
-    Pons X, Solé-Sugrañes L (1994) A simple radiometric correction model to improve automatic mapping of vegetation from multispectral satellite data. Remote Sensing of Environment, 48:191-204
+   Pons X, Solé-Sugrañes L (1994) A simple radiometric correction model to improve automatic mapping of vegetation from multispectral satellite data. Remote Sensing of Environment, 48:191-204
 
 
 
