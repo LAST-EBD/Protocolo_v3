@@ -1,6 +1,6 @@
 
 # coding: utf-8
-%matplotlib inline
+#%matplotlib inline
 
 import os, shutil, pymongo, re, time, subprocess, pandas, rasterio, sys, stat 
 import numpy as np
@@ -401,17 +401,17 @@ class NLandsat(object):
                     else:
                         print('usando Fmask con Landsat', self.sat)
                         #Abrimos la mascara para evitar problemas con los valores bajos en los bordes de Fmask
-                        #inner = os.path.join(self.data, 'intern_buffer.tif')
-                        #Inner = gdal.Open(inner).ReadAsArray()
-                        #data2 = data[((Inner == 1) & ((Fmask==1) | (((Fmask==0) & (data != 0)) & (Hillshade<(np.percentile(Hillshade, 20))))))]
+                        inner = os.path.join(self.data, 'intern_buffer.tif')
+                        Inner = gdal.Open(inner).ReadAsArray()
+                        data2 = data[((Inner == 1) & ((Fmask==1) | (((Fmask==0) & (data != 0)) & (Hillshade<(np.percentile(Hillshade, 20))))))]
 
                         #mask = np.copy(data)
                         #mask[mask != 0] == 1
-                        print('Ahora viene el erode')
-                        erode = ndimage.grey_erosion(data, size=(5,5,1))
+                        #print('Ahora viene el erode')
+                        #erode = ndimage.grey_erosion(data, size=(5,5,1))
                         #print(type(erode), erode.size, erode.shape)
                         
-                        data2 = data[((erode != 0) & ((Fmask==1) | (((Fmask==0) & (data != 0)) & (Hillshade<(np.percentile(Hillshade, 20))))))]
+                        #data2 = data[((erode != 0) & ((Fmask==1) | (((Fmask==0) & (data != 0)) & (Hillshade<(np.percentile(Hillshade, 20))))))]
                     
                     #Aqui iria una alternativa a Fmask si fallara
 
@@ -531,7 +531,7 @@ class NLandsat(object):
                     profile = src.meta
                     profile.update(dtype=rasterio.uint16)
 
-                    outfile = os.path.join(path_rad, self.escena + '_sr_' + banda + '.tif')
+                    outfile = os.path.join(path_rad, self.escena + '_gr2_' + banda + '.tif')
                     print(outfile)                
 
                     with rasterio.open(outfile, 'w', **profile) as dst:
@@ -565,7 +565,7 @@ class NLandsat(object):
         landsat = db.landsat
         
         try:
-            landsat.update_one({'_id':self.escena}, {'$set':{'Info.Pasos.rad': {'Corrad': 'True', 'Kl-Values': kl_values, 'Fecha': datetime.now()}}})
+            landsat.update_one({'_id':self.escena}, {'$set':{'Info.Pasos.rad': {'Corrad': 'True', 'Kl-Values': self.kl, 'Fecha': datetime.now()}}})
             
         except Exception as e:
             print("Unexpected error:", type(e), e)
@@ -817,7 +817,7 @@ class NLandsat(object):
         path_nor = os.path.join(self.nor, self.escena)
         
         banda_num = banda[-6:-4]
-        outFile = os.path.join(path_nor, self.escena + '_nor_' + banda_num + '.tif')
+        outFile = os.path.join(path_nor, self.escena + '_grn2_' + banda_num + '.tif')
         print('Outfile', outFile)
         
         #Metemos la referencia para el NoData, vamos a coger la banda 5 en rad (... Y por que no?)
@@ -850,8 +850,8 @@ class NLandsat(object):
             with rasterio.open(outFile, 'w', **profile) as dst:
                 dst.write(rs.astype(rasterio.uint16))
        
-
-                  
+    
+                      
     def run(self):
         
         t0 = time.time()
