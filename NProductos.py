@@ -69,7 +69,6 @@ class Product(object):
                 if re.search('tif$', i):
                     
                     banda = i[-6:-4].lower()
-                    print(banda)
                                         
                     if banda == 'b1':
                         self.blue = os.path.join(self.nor, i)
@@ -149,8 +148,8 @@ class Product(object):
         
     def flood(self):
         
-        waterMask = os.path.join(self.data, 'water_mask.tif')
-        outfile = os.path.join(self.productos, self.escena + '_flood_1200.tif')
+        waterMask = os.path.join(self.data, 'water_mask_turb.tif')
+        outfile = os.path.join(self.productos, self.escena + '_flood.tif')
         print(outfile)
         
         with rasterio.open(waterMask) as wmask:
@@ -166,7 +165,7 @@ class Product(object):
             #RED[RED==0] = 1
 
         #flood = np.where(((FMASK == 0)| (FMASK == 1)) & (WMASK == 1) & (SWIR1 <= 1636), 1, 0)
-        flood = np.where(((FMASK != 2) & (FMASK != 4)) & ((SWIR1 != 0) & (SWIR1 <= 1000)) & (WMASK == 1), 1, 0)
+        flood = np.where(((FMASK != 2) & (FMASK != 4)) & ((SWIR1 != 0) & (SWIR1 <= 1200)) & (WMASK > 0), 1, 0)
         
         
         profile = swir1.meta
@@ -190,3 +189,94 @@ class Product(object):
             print("Unexpected error:", type(e), e)
             
         print('Fllod Mask Generada')
+        
+        
+        
+    def turbidity(self, flood):
+        
+        waterMask = os.path.join(self.data, 'water_mask_turb.tif')
+        outmarisma = os.path.join(self.productos, self.escena + 'turb_marisma.tif')
+        outrio = os.path.join(self.productos, self.escena + '_turb_rio.tif')
+        #print(outfile)
+        
+        with rasterio.open(flood) as flood:
+            FLOOD = flood.read()
+        
+        with rasterio.open(waterMask) as wmask:
+            WMASK = wmask.read()
+            
+        with rasterio.open(self.blue) as blue:
+            BLUE = blue.read()
+            BLUE = np.where(BLUE == 0, 1, BLUE)
+                        
+        with rasterio.open(self.green) as green:
+            GREEN = green.read()
+            GREEN = np.where(GREEN == 0, 1, GREEN)
+            GREEN_R = np.where((GREEN<0.1), 0.1, GREEN)
+            GREEN_RECLASS = np.where((GREEN_R>=0.4), 0.4, GREEN_R)
+
+        with rasterio.open(self.red) as red:
+            RED = red.read()
+            RED = np.where(RED == 0, 1, RED)
+            RED_RECLASS = np.where((RED>=0.2), 0.2, RED)
+            
+        with rasterio.open(self.nir) as nir:
+            NIR = nir.read()
+            NIR = np.where(NIR == 0, 1, NIR)
+            NIR_RECLASS = np.where((NIR>0.5), 0.5, NIR)
+            
+        with rasterio.open(self.swir1) as swir1:
+            SWIR1 = swir1.read()
+            SWIR1 = np.where(SWIR1 == 0, 1, SWIR1)
+            SWIR_RECLASS = np.where((SWIR1>=0.09), 0.09, SWIR1)
+        
+        
+        #Turbidez para la el rio
+        rio = (-4.3 + (85.22 * GREEN_RECLASS) - (455.9 * np.power(GREEN_RECLASS,2)) \
+            + (594.58 * np.power(GREEN_RECLASS,3)) + (32.3 * RED) - (15.36 * NIR_RECLASS)  \
+            + (21 * np.power(NIR_RECLASS,2))) - 0.01
+        
+        '''rio = (-4.3 + (0.212508 * GREEN_RECLASS) - (0.002835447 * np.power(GREEN_RECLASS,2)) \
+            + (0.000009221009 * np.power(GREEN_RECLASS,3)) + (0.1055439 * RED) - (0.03640604 * NIR_RECLASS)  \
+            + (0.0001178843 * np.power(NIR_RECLASS,2))) - 0.01'''
+        
+        RIO = np.power(math.e, rio)
+        
+        #Turbidez para la marisma
+        marisma = (4.1263574 + (18.8113118 * RED_RECLASS) - (32.2615220 * SWIR_RECLASS) \
+        - 0.6114109 * np.true_divide(BLUE, NIR)) - 0.01
+        MARISMA = np.power(math.e, marisma)
+        
+        
+        
+        TURBMARISMA = np.where(((FLOOD == 1) & (WMASK == 1)), MARISMA, 0)
+        TURBRIO = np.where(((FLOOD == 1) & (WMASK == 2)), RIO, 0)
+                        #np.where(((AGUA == 1) & (WMASK == 2)), RIO, 0))
+                                
+        #TURBIDEZ = np.where((((SWIR1 != 0) & (SWIR1 <= 1200)) & (WMASK == 2)), RIO, TURBMARISMA)
+        
+        
+        profile = swir1.meta
+        profile.update(nodata=0)
+        profile.update(dtype=rasterio.float32)
+
+        with rasterio.open(outmarisma, 'w', **profile) as dst:
+            dst.write(TURBMARISMA.astype(rasterio.float32))
+            
+        with rasterio.open(outrio, 'w', **profile) as dst:
+            dst.write(TURBRIO.astype(rasterio.float32))
+            
+        #Insertamos la cobertura de nubes en la BD
+        connection = pymongo.MongoClient("mongodb://localhost")
+        db=connection.teledeteccion
+        landsat = db.landsat
+        
+        
+        try:
+        
+            landsat.update_one({'_id':self.escena}, {'$set':{'Productos': ['Turbidity']}},  upsert=True)
+            
+        except Exception as e:
+            print("Unexpected error:", type(e), e)
+            
+        print('Turbidity Mask Generada')
