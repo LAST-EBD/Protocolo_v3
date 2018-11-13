@@ -23,8 +23,6 @@ class Product(object):
         self.data = os.path.join(self.raiz, 'data')
         self.temp = os.path.join(self.raiz, 'temp')
         self.productos = os.path.join(self.raiz, 'pro')
-        #self.vals = {}
-        #self.d = {}
         self.pro_esc = os.path.join(self.productos, self.escena)
         os.makedirs(self.pro_esc, exist_ok=True)
         
@@ -109,18 +107,14 @@ class Product(object):
         
         with rasterio.open(self.nir) as nir:
             NIR = nir.read()
-            #NIR[NIR==0] = 1
-
+            
         with rasterio.open(self.red) as red:
             RED = red.read()
 
         num = NIR.astype(float)-RED.astype(float)
         den = NIR+RED
         ndvi = np.true_divide(num, den)
-        
-        #ndvi[ndvi<-1] = -1
-        #ndvi[ndvi>1] = 1
-        
+                
         profile = nir.meta
         profile.update(nodata=-9999)
         profile.update(dtype=rasterio.float32)
@@ -145,7 +139,6 @@ class Product(object):
         
         
         
-        
     def flood(self):
         
         waterMask = os.path.join(self.data, 'water_mask_turb.tif')
@@ -154,17 +147,14 @@ class Product(object):
         
         with rasterio.open(waterMask) as wmask:
             WMASK = wmask.read()
-            #NIR[NIR==0] = 1
-            
+                        
         with rasterio.open(self.fmask) as fmask:
             FMASK = fmask.read()
-            #NIR[NIR==0] = 1
-
+            
         with rasterio.open(self.swir1) as swir1:
             SWIR1 = swir1.read()
-            #RED[RED==0] = 1
+            
 
-        #flood = np.where(((FMASK == 0)| (FMASK == 1)) & (WMASK == 1) & (SWIR1 <= 1636), 1, 0)
         flood = np.where(((FMASK != 2) & (FMASK != 4)) & ((SWIR1 != 0) & (SWIR1 <= 1200)) & (WMASK > 0), 1, 0)
         
         
@@ -195,9 +185,8 @@ class Product(object):
     def turbidity(self, flood):
         
         waterMask = os.path.join(self.data, 'water_mask_turb.tif')
-        outmarisma = os.path.join(self.productos, self.escena + 'turb_marisma.tif')
-        outrio = os.path.join(self.productos, self.escena + '_turb_rio.tif')
-        #print(outfile)
+        outfile = os.path.join(self.productos, self.escena + '_turbidity.tif')
+        print(outfile)
         
         with rasterio.open(flood) as flood:
             FLOOD = flood.read()
@@ -208,63 +197,55 @@ class Product(object):
         with rasterio.open(self.blue) as blue:
             BLUE = blue.read()
             BLUE = np.where(BLUE == 0, 1, BLUE)
+            BLUE = np.true_divide(BLUE, 10000)
                         
         with rasterio.open(self.green) as green:
             GREEN = green.read()
             GREEN = np.where(GREEN == 0, 1, GREEN)
+            GREEN = np.true_divide(GREEN, 10000)
             GREEN_R = np.where((GREEN<0.1), 0.1, GREEN)
             GREEN_RECLASS = np.where((GREEN_R>=0.4), 0.4, GREEN_R)
 
         with rasterio.open(self.red) as red:
             RED = red.read()
             RED = np.where(RED == 0, 1, RED)
+            RED = np.true_divide(RED, 10000)
             RED_RECLASS = np.where((RED>=0.2), 0.2, RED)
             
         with rasterio.open(self.nir) as nir:
             NIR = nir.read()
             NIR = np.where(NIR == 0, 1, NIR)
+            NIR = np.true_divide(NIR, 10000)
             NIR_RECLASS = np.where((NIR>0.5), 0.5, NIR)
             
         with rasterio.open(self.swir1) as swir1:
             SWIR1 = swir1.read()
             SWIR1 = np.where(SWIR1 == 0, 1, SWIR1)
-            SWIR_RECLASS = np.where((SWIR1>=0.09), 0.09, SWIR1)
+            SWIR1 = np.true_divide(SWIR1, 10000)
+            SWIR_RECLASS = np.where((SWIR1>=0.09), 0.9, SWIR1)
         
         
         #Turbidez para la el rio
         rio = (-4.3 + (85.22 * GREEN_RECLASS) - (455.9 * np.power(GREEN_RECLASS,2)) \
             + (594.58 * np.power(GREEN_RECLASS,3)) + (32.3 * RED) - (15.36 * NIR_RECLASS)  \
-            + (21 * np.power(NIR_RECLASS,2))) - 0.01
+            + (21 * np.power(NIR_RECLASS,2))) - 0.01        
+        #RIO = np.power(math.e, rio)
         
-        '''rio = (-4.3 + (0.212508 * GREEN_RECLASS) - (0.002835447 * np.power(GREEN_RECLASS,2)) \
-            + (0.000009221009 * np.power(GREEN_RECLASS,3)) + (0.1055439 * RED) - (0.03640604 * NIR_RECLASS)  \
-            + (0.0001178843 * np.power(NIR_RECLASS,2))) - 0.01'''
-        
-        RIO = np.power(math.e, rio)
-        
-        #Turbidez para la marisma
-        marisma = (4.1263574 + (18.8113118 * RED_RECLASS) - (32.2615220 * SWIR_RECLASS) \
-        - 0.6114109 * np.true_divide(BLUE, NIR)) - 0.01
-        MARISMA = np.power(math.e, marisma)
+        #Turbidez para la marisma        
+        marisma = (4.1263574 + (18.8113118 * RED_RECLASS) - (32.2615219 * SWIR_RECLASS) \
+        - 0.0114108989999999 * np.true_divide(BLUE, NIR)) - 0.01
+        #MARISMA = np.power(math.e, marisma)
         
         
-        
-        TURBMARISMA = np.where(((FLOOD == 1) & (WMASK == 1)), MARISMA, 0)
-        TURBRIO = np.where(((FLOOD == 1) & (WMASK == 2)), RIO, 0)
-                        #np.where(((AGUA == 1) & (WMASK == 2)), RIO, 0))
-                                
-        #TURBIDEZ = np.where((((SWIR1 != 0) & (SWIR1 <= 1200)) & (WMASK == 2)), RIO, TURBMARISMA)
-        
+        TURBIDEZ = np.where(((FLOOD == 1) & (WMASK == 1)), marisma, 
+                             np.where(((FLOOD == 1) & (WMASK == 2)), rio, 0))
         
         profile = swir1.meta
         profile.update(nodata=0)
         profile.update(dtype=rasterio.float32)
-
-        with rasterio.open(outmarisma, 'w', **profile) as dst:
-            dst.write(TURBMARISMA.astype(rasterio.float32))
-            
-        with rasterio.open(outrio, 'w', **profile) as dst:
-            dst.write(TURBRIO.astype(rasterio.float32))
+                             
+        with rasterio.open(outfile, 'w', **profile) as dst:
+            dst.write(TURBIDEZ.astype(rasterio.float32))
             
         #Insertamos la cobertura de nubes en la BD
         connection = pymongo.MongoClient("mongodb://localhost")
